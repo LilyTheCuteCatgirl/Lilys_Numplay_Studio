@@ -1,0 +1,18 @@
+# Build output and temporary source checkouts
+_publish/
+_source_assets/
+_upstream_kit/
+
+# Calculator builds and personal game saves
+*.nwa
+*.sav
+NumPlay-Save-Vault-*.json
+*Save-Vault*.json
+*.py
+
+# Local environment
+.env
+.env.*
+node_modules/
+.DS_Store
+Thumbs.db

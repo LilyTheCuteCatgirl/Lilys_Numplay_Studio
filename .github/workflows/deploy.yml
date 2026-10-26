@@ -1,0 +1,83 @@
+name: Publish Lily's NumplayStudio
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout website
+        uses: actions/checkout@v4
+        with:
+          path: website
+          persist-credentials: false
+
+      - name: Checkout upstream linker and game metadata
+        uses: actions/checkout@v4
+        with:
+          repository: Mason363/NumPlay
+          ref: main
+          path: _source_assets
+          persist-credentials: false
+          sparse-checkout: |
+            /customize/ld/
+            /games/games.json
+            /games/*/README.md
+          sparse-checkout-cone-mode: false
+
+      - name: Checkout upstream generated game kit
+        uses: actions/checkout@v4
+        with:
+          repository: Mason363/NumPlay
+          ref: kit
+          path: _upstream_kit
+          persist-credentials: false
+
+      - name: Assemble website
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _publish/kit _publish/ld _publish/games
+          cp -a website/site/. _publish/
+          cp -a _source_assets/customize/ld/. _publish/ld/
+          cp -a _upstream_kit/. _publish/kit/
+          cp _source_assets/games/games.json _publish/games/games.json
+          while IFS= read -r -d '' file; do
+            target="_publish/${file#_source_assets/}"
+            mkdir -p "$(dirname "$target")"
+            cp "$file" "$target"
+          done < <(find _source_assets/games -type f -name README.md -print0)
+          for file in index.html app.css app.js save-vault.js usb-readonly.js usb-installer.js kit/kit.json ld/ld.js ld/ld.wasm ld/objcopy.js ld/objcopy.wasm games/games.json; do
+            test -s "_publish/$file" || { echo "Missing asset: $file"; exit 1; }
+          done
+          test -f _publish/.nojekyll
+          for script in app.js save-vault.js usb-readonly.js usb-installer.js; do
+            node --check "_publish/$script"
+          done
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _publish
+
+      - name: Deploy Pages site
+        id: deployment
+        uses: actions/deploy-pages@v4
