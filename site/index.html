@@ -9,10 +9,10 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="Lily's NumplayStudio">
   <meta property="og:description" content="Choose games, build NumPlay, and manage your calculator game saves.">
-  <meta property="og:image" content="https://lilythecutecatgirl.github.io/Lilys_Numplay_Studio/og.png">
+  <meta property="og:image" content="https://lilythecutecatgirl.github.io/Lilys_Numplay_Studio/icons/og.png">
   <title>Lily's NumplayStudio | Build your NumPlay</title>
-  <link rel="icon" href="favicon.png" type="image/png">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" href="icons/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <script>
     // Restore the chosen appearance before styles render (no light-theme flash).
     try {
@@ -22,9 +22,23 @@
     } catch (_) { /* Storage may be blocked; default to light. */ }
   </script>
   <link rel="stylesheet" href="app.css">
-  <script src="usb-readonly.js" defer></script>
-  <script src="usb-installer.js" defer></script>
-  <script src="save-vault.js" defer></script>
+  <link rel="stylesheet" href="game-saves/stats.css">
+  <script src="usb/usb-readonly.js" defer></script>
+  <script src="usb/usb-installer.js" defer></script>
+  <script src="game-saves/stats.js" defer></script>
+  <script src="game-saves/games/hillclimb.js" defer></script>
+  <script src="game-saves/games/binary.js" defer></script>
+  <script src="game-saves/games/monkeymart.js" defer></script>
+  <script src="game-saves/games/subway.js" defer></script>
+  <script src="game-saves/games/stickmanhook.js" defer></script>
+  <script src="game-saves/games/jetpackjoyride.js" defer></script>
+  <script src="game-saves/games/dune.js" defer></script>
+  <script src="game-saves/games/cookieclicker.js" defer></script>
+  <script src="game-saves/games/bundled.js" defer></script>
+  <script src="game-saves/games/catalog.js" defer></script>
+  <script src="game-saves/restore.js" defer></script>
+  <script src="game-saves/backup.js" defer></script>
+  <script src="game-saves/save-vault.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>

@@ -16,3 +16,6 @@ NumPlay-Save-Vault-*.json
 node_modules/
 .DS_Store
 Thumbs.db
+
+# Local preview runner is safe to commit. Do not track personal save scripts.
+!tools/localhost.py
