@@ -182,6 +182,36 @@
       } else icon.textContent = '📁';
       const details = make('div', 'vault-details');
       details.append(make('strong', '', title(g.id)), make('p', 'muted', [...g.files].join(' · ')));
+      if (g.id !== 'unknown') {
+        const restoreOne = make('button', 'button button-outline vault-restore-one', 'Restore this game');
+        restoreOne.type = 'button';
+        restoreOne.title = "Replace this game's calculator save with your browser backup";
+        restoreOne.disabled = usbBusy;
+        restoreOne.addEventListener('click', () => restoreBackups(g.id));
+        details.append(restoreOne);
+      }
+      if (window.NumPlaySaveStats) {
+        const info = window.NumPlaySaveStats.summary(g.id, stored, g.files);
+        if (info) {
+          const bar = make('div', 'vault-inline-stats');
+          if (info.error) {
+            bar.append(make('span', 'vault-stat', 'Stats unavailable'));
+          } else {
+            for (const [label, value] of [
+              ['Coins', info.coins.toLocaleString()],
+              ['Cars', info.cars + '/13'], ['Maps', info.maps + '/13']]) {
+              const item = make('span', 'vault-stat');
+              item.append(make('strong', '', label + ': '), document.createTextNode(value));
+              bar.append(item);
+            }
+          }
+          const see = make('button', 'vault-stats-link', 'See all stats');
+          see.type = 'button';
+          see.addEventListener('click', () => window.NumPlaySaveStats.open(g.id, g.files));
+          bar.append(see);
+          details.append(bar);
+        }
+      }
       const meta = make('div', 'vault-meta');
       meta.append(make('strong', '', 'Backed up'), make('span', '', fmtDate(g.updated)));
       row.append(icon, details, meta); list.append(row);
@@ -322,6 +352,7 @@
   }
   // ----- Real one-click backup / install progress UI -----
   let usbBusy = false, retryScripts = null, retryDevice = null;
+  let hasUnfinishedInstallRestore = false;
   // A physical unplug/replug is required on the user's N0120 to expose fresh
   // USB storage after the installation reboot. Never mark completion beforehand.
   let awaitingPhysicalReplug = false;
@@ -487,6 +518,7 @@
       checked.scripts.some((r, i) => r.name !== plan.scripts[i].name ||
         !r.value.every((byte, j) => byte === plan.scripts[i].value[j])))
       throw new Error('Could not verify the save-restore plan. No flash changes were made.');
+    hasUnfinishedInstallRestore = true;
     return plan;
   }
   async function saveInstallSnapshot(session) {
@@ -674,8 +706,11 @@
       $('vault-install-dialog').querySelector('button.button-wide.work-close').hidden = false;
       renderResult('vault-install-results', scripts.filter((r) => /_saves\.py$/i.test(r.name))
         .map((r) => ({ name: r.name })));
-      if (pending && !pending.completed) await request('install_backups', 'readwrite', (store) =>
-        store.put({ ...pending, completed: true }));
+      if (pending && !pending.completed) {
+        await request('install_backups', 'readwrite', (store) =>
+          store.put({ ...pending, completed: true }));
+        hasUnfinishedInstallRestore = false;
+      }
       retryScripts = null; retryDevice = null; awaitingPhysicalReplug = false;
       clearHandoff();
       notifier('Calculator saves restored and verified.');
@@ -688,10 +723,105 @@
       usbBusy = false; doneWork(dialog);
     }
   }
+  // Manual restore reads the current browser vault, not an older installation plan.
+  // This path only writes calculator Python file storage and never flashes apps.
+  async function restoreBackups(gameId = null) {
+    if (usbBusy) return;
+    if (!ready || !stored.length) { notifier('Import or back up your games first.'); return; }
+    if (!window.NumPlayUsbRead || !window.NumPlayUsbInstall || !window.NumPlayGameSaveRestore) {
+      notifier('A save restore module is missing. Refresh the page.'); return;
+    }
+    usbBusy = true;
+    const dialog = beginWork('vault-install-dialog', gameId ? 'Restore ' + title(gameId) : 'Restore saved games');
+    $('vault-install-replug').hidden = true;
+    $('vault-install-decision').hidden = true;
+    $('vault-install-results').replaceChildren();
+    $('vault-install-retry').hidden = true;
+    $('vault-install-dialog').querySelector('button.button-wide.work-close').hidden = true;
+    $('vault-install-dialog').querySelector('.work-bottom-note').hidden = true;
+    $('vault-install-nwagra-note').hidden = true;
+    const desc = dialog.querySelector('.work-intro');
+    if (desc) {
+      desc.hidden = false;
+      desc.textContent = 'This replaces matching game saves on the connected calculator with your browser backups. Other game files are preserved. No app installation or flashing occurs.';
+    }
+    workUpdate('vault-install', 'Choose your NumWorks in the USB window…', 0);
+    let session, startedWrite = false;
+    try {
+      // Keep the WebUSB picker in the original button click's user gesture.
+      const connection = window.NumPlayUsbRead.requestSession(message => workUpdate('vault-install', message, 8));
+      session = await connection;
+      const pending = await getInstallBackup('pending-restore');
+      if (pending && !pending.completed) throw new Error(
+        'A previous installation still needs its save recovery. Use Reconnect & finish saves first. No data was changed.');
+      workUpdate('vault-install', 'Matching game backups to calculator saves…', 15);
+      await loadGameMap();
+      if (!gameMap.size) throw new Error('Game save definitions are unavailable. No files were changed.');
+      const plan = window.NumPlayGameSaveRestore.prepare(stored, gameMap, session.records, gameId);
+      if (!plan.matched.length) throw new Error('No saved games in your browser match files on this calculator. Nothing was changed.');
+      const changed = plan.matched.filter(g => g.changed);
+      if (!plan.updates.length) {
+        workUpdate('vault-install', 'All matching game saves already match your backups. Nothing was written.', 100);
+        notifier('Your calculator saves already match these backups.');
+        return;
+      }
+      const summary = plan.matched.map(g => title(g.id)).join(', ');
+      const proceed = await chooseInStudio('Replace calculator game saves?',
+        'Replace ' + changed.length + ' game backup' + (changed.length === 1 ? '' : 's') +
+        ' on your connected ' + session.model + '?\n' + summary +
+        '\n\nExisting progress for these games will be overwritten. All other calculator storage files will be preserved. A readback verification follows.',
+        'Cancel, keep calculator saves', 'Restore my backups');
+      if (!proceed) throw new Error('Restore cancelled. Calculator saves were not changed.');
+      // A complete raw snapshot is saved and re-read from IndexedDB BEFORE any USB write.
+      // It is separate from the installation snapshots and never overwrites the vault.
+      workUpdate('vault-install', 'Protecting current calculator files…', 20);
+      const id = 'manual-restore-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      const snapshot = { id, model: session.model, serial: session.device.serialNumber || '',
+        savedAt: Date.now(), games: plan.matched.map(g => g.id),
+        scripts: session.records.map(r => ({ name: r.name, value: new Uint8Array(r.value) })) };
+      await request('install_backups', 'readwrite', store => store.put(snapshot));
+      const checked = await getInstallBackup(id);
+      if (!checked || checked.model !== snapshot.model || checked.scripts.length !== snapshot.scripts.length ||
+        checked.scripts.some((rec, i) => rec.name !== snapshot.scripts[i].name ||
+          rec.value.length !== snapshot.scripts[i].value.length ||
+          rec.value.some((v, j) => v !== snapshot.scripts[i].value[j])))
+        throw new Error('Could not verify the calculator safety snapshot. No data was written.');
+      // Only the selected games are replaced. restoreSession merges all other
+      // live records unchanged, checks storage signatures and verifies readback.
+      workUpdate('vault-install', 'Restoring backed-up game progress…', 28);
+      startedWrite = true;
+      const restored = await window.NumPlayUsbInstall.restoreSession(session, plan.updates,
+        (label, portion) => workUpdate('vault-install', label, 28 + 70 * portion), true);
+      workUpdate('vault-install', 'Game saves restored and verified · ' + restored + ' storage files present.', 100);
+      const list = $('vault-install-results');
+      for (const game of changed) {
+        const li = make('li');
+        li.append(make('span', '', title(game.id)), make('small', '', 'Restored and verified'));
+        list.append(li);
+      }
+      notifier('Game backups restored to calculator and verified.');
+    } catch (error) {
+      workUpdate('vault-install',
+        (startedWrite ? 'Restore may be incomplete: ' : 'Restore stopped before writing: ') +
+        (error?.message || error) +
+        (startedWrite ? ' Reconnect before using the game. Your original calculator snapshot and browser backups remain saved locally.' :
+          ' Your calculator was not modified by this attempt.'),
+        startedWrite ? 90 : 0);
+    } finally {
+      if (session) await session.close().catch(() => {});
+      usbBusy = false;
+      doneWork(dialog);
+      $('vault-install-dialog').querySelector('button.button-wide.work-close').hidden = false;
+      refresh();
+    }
+  }
   async function retryRestore() { await recoverSaves(); }
 
+  let initialized = false;
   async function init(initialKit) {
-    kit = initialKit;
+    if (initialKit) kit = initialKit;
+    if (initialized) { refresh(); return; }
+    initialized = true;
     $('view-select').addEventListener('click', () => view('select'));
     $('view-backups').addEventListener('click', () => view('backups'));
     $('vault-import').addEventListener('click', () => $('vault-import-file').click());
@@ -705,7 +835,8 @@
     recoverButton.id = 'vault-restore-usb'; recoverButton.type = 'button';
     const backupButton = $('vault-backup-usb');
     backupButton.insertAdjacentElement('afterend', recoverButton);
-    recoverButton.addEventListener('click', () => recoverSaves());
+    recoverButton.addEventListener('click', () =>
+      hasUnfinishedInstallRestore ? recoverSaves() : restoreBackups());
     $('vault-install-retry').textContent = 'Reconnect & finish saves';
     $('vault-install-retry').addEventListener('click', retryRestore);
     $('vault-install-unplugged').addEventListener('click', acknowledgeUnplug);
@@ -736,7 +867,18 @@
     try {
       db = await openDb();
       stored = await allFiles();
+      const unfinished = await getInstallBackup('pending-restore');
+      hasUnfinishedInstallRestore = !!(unfinished && !unfinished.completed);
       ready = true;
+      window.NumPlaySaveStats?.bind({
+        files: () => stored,
+        canEdit: () => ready && !usbBusy,
+        save: async (name, content) => {
+          await addCopy(name, content, 'Edited in Studio');
+          refresh();
+          notifier('Game backup updated. Export a backup to keep a portable copy.');
+        },
+      });
       refresh();
       // A functioning library must not require a request to GitHub.
       loadGameMap().then(refresh);
@@ -757,4 +899,13 @@
     if (button) button.disabled = !ok;
   }
   window.NumPlaySaveVault = { init, bindInstall, updateInstallAvailability };
+  // The save library works independently of the game kit, including offline.
+  const startVault = () => init(null).catch((error) => {
+    console.error('Save Vault initialization failed:', error);
+  });
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startVault, { once: true });
+  } else {
+    startVault();
+  }
 })();

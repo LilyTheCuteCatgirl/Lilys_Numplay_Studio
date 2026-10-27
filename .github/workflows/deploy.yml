@@ -62,11 +62,11 @@ jobs:
             mkdir -p "$(dirname "$target")"
             cp "$file" "$target"
           done < <(find _source_assets/games -type f -name README.md -print0)
-          for file in index.html app.css app.js save-vault.js usb-readonly.js usb-installer.js kit/kit.json ld/ld.js ld/ld.wasm ld/objcopy.js ld/objcopy.wasm games/games.json; do
+          for file in index.html app.css app.js usb/usb-readonly.js usb/usb-installer.js game-saves/save-vault.js game-saves/stats.js game-saves/stats.css game-saves/restore.js game-saves/games/hillclimb.js icons/favicon.png icons/apple-touch-icon.png icons/og.png kit/kit.json ld/ld.js ld/ld.wasm ld/objcopy.js ld/objcopy.wasm games/games.json; do
             test -s "_publish/$file" || { echo "Missing asset: $file"; exit 1; }
           done
           test -f _publish/.nojekyll
-          for script in app.js save-vault.js usb-readonly.js usb-installer.js; do
+          for script in app.js usb/usb-readonly.js usb/usb-installer.js game-saves/save-vault.js game-saves/stats.js game-saves/restore.js game-saves/games/hillclimb.js; do
             node --check "_publish/$script"
           done
 

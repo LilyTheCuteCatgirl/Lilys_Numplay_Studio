@@ -1,0 +1,61 @@
+/* Save Vault game stats and editor interface. */
+.vault-inline-stats { display: flex; align-items: center; gap: 8px 13px; flex-wrap: wrap; margin-top: 8px; }
+.vault-stat { font-size: 12px; color: var(--muted, #727777); }
+.vault-stat strong { color: var(--ink, #202323); font-weight: 700; }
+.vault-stats-link { border: 0; background: transparent; padding: 2px 0; color: #36875f; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.vault-stats-link:hover { color: #235c42; }
+.gs-dialog { width: min(880px, calc(100vw - 24px)); max-width: 880px; max-height: min(88vh, 900px); padding: 0; overflow: auto; }
+.gs-dialog-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 24px 10px; }
+.gs-dialog-top h2 { margin: 0 0 5px; }
+.gs-dialog-top p { margin: 0; }
+.gs-editor-note { font-size: 13px; margin: 0 24px 12px; border: 1px solid var(--border, #ddd); padding: 10px 12px; border-radius: 9px; }
+.gs-dialog-body { padding: 0 24px 20px; }
+.gs-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 8px 0 18px; }
+.gs-tile { border: 1px solid var(--border, #ddd); border-radius: 10px; padding: 12px; display: grid; gap: 4px; }
+.gs-tile small { color: var(--muted, #727777); }
+.gs-tile strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.gs-section { margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--border, #ddd); }
+.gs-section h3 { font-size: 17px; margin: 0 0 12px; }
+.gs-field-grid, .gs-distance-grid, .gs-upgrade-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.gs-field { display: grid; gap: 5px; font-size: 12px; min-width: 0; }
+.gs-field span { color: var(--muted, #727777); }
+.gs-input { width: 100%; min-width: 0; padding: 9px; font: inherit; color: var(--ink, #222); background: var(--paper, #fff); border: 1px solid var(--border, #ccc); border-radius: 7px; }
+.gs-input:disabled { opacity: .85; }
+.gs-check-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
+.gs-check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.gs-check input { accent-color: #388665; }
+.gs-map-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.gs-map-item { border: 1px solid var(--border, #ddd); border-radius: 8px; padding: 9px; display: grid; gap: 9px; }
+.gs-section > .button, .gs-section > .gs-field { margin-top: 12px; }
+.gs-details { border: 1px solid var(--border, #ddd); border-radius: 8px; margin-bottom: 7px; }
+.gs-details summary { padding: 12px; font-weight: 650; cursor: pointer; }
+.gs-upgrade-grid, .gs-distance-grid { padding: 0 12px 12px; }
+.gs-dialog-footer { position: sticky; bottom: 0; padding: 14px 24px 20px; background: var(--paper, #fff); border-top: 1px solid var(--border, #ddd); display: flex; flex-wrap: wrap; justify-content: end; align-items: center; gap: 10px; }
+.gs-message { flex: 1 1 100%; margin: 0; color: #a24737; font-size: 12px; }
+.gs-message:empty { display: none; }
+.gs-warning { padding: 12px; color: #98533c; border: 1px solid var(--border, #ddd); border-radius: 8px; }
+@media (max-width: 600px) {
+  .gs-dialog-top { padding: 16px 15px 8px; }
+  .gs-editor-note { margin: 0 15px 12px; }
+  .gs-dialog-body { padding: 0 15px 15px; }
+  .gs-dialog-footer { padding: 12px 15px; }
+  .gs-overview, .gs-field-grid, .gs-distance-grid, .gs-upgrade-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gs-check-grid, .gs-map-grid { grid-template-columns: minmax(0, 1fr); }
+  .gs-tile strong { font-size: 16px; }
+  .gs-dialog-footer .button { flex: 1; }
+}
+
+html[data-theme="dark"] .vault-stats-link { color: #a7db9e; }
+html[data-theme="dark"] .gs-dialog-footer { background: var(--paper); }
+
+/* Consistent controls in the save library and stats editors. */
+.vault-restore-one { margin-top: 9px; padding: 6px 11px; min-height: 33px; font-size: 11px; }
+.vault-restore-one:disabled { opacity: .5; cursor: not-allowed; }
+input[type="checkbox"] { accent-color: #598f36; width: 16px; height: 16px; cursor: pointer; }
+input[type="checkbox"]:disabled { cursor: default; }
+html[data-theme="dark"] input[type="checkbox"] { accent-color: #a3d881; }
+html { scrollbar-color: #aab2b0 var(--paper); scrollbar-width: thin; }
+html[data-theme="dark"] { scrollbar-color: #66736e var(--paper); }
+.dialog, .readme-content, .gs-dialog-body, .work-result-list { scrollbar-color: #9da9a3 var(--soft); scrollbar-width: thin; }
+html[data-theme="dark"] .dialog, html[data-theme="dark"] .readme-content,
+html[data-theme="dark"] .gs-dialog-body, html[data-theme="dark"] .work-result-list { scrollbar-color: #65756d var(--soft); }
