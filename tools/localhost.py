@@ -77,7 +77,7 @@ def prepare_assets(refresh):
         "index.html", "app.js", "app.css",
         "usb/usb-readonly.js", "usb/usb-installer.js",
         "game-saves/save-vault.js", "game-saves/stats.js",
-        "game-saves/stats.css", "game-saves/games/hillclimb.js", "game-saves/restore.js",
+        "game-saves/stats.css", "game-saves/games/hillclimb.js", "game-saves/games/binary.js", "game-saves/games/monkeymart.js", "game-saves/games/subway.js", "game-saves/games/stickmanhook.js", "game-saves/games/jetpackjoyride.js", "game-saves/games/dune.js", "game-saves/games/cookieclicker.js", "game-saves/games/bundled.js", "game-saves/restore.js", "game-saves/backup.js",
     )
     missing = [name for name in required if not (SITE / name).is_file()]
     if missing:
@@ -88,7 +88,7 @@ def prepare_assets(refresh):
     markup = (SITE / "index.html").read_text(encoding="utf-8")
     script_paths = (
         "usb/usb-readonly.js", "usb/usb-installer.js",
-        "game-saves/stats.js", "game-saves/games/hillclimb.js", "game-saves/restore.js",
+        "game-saves/stats.js", "game-saves/games/hillclimb.js", "game-saves/games/binary.js", "game-saves/games/monkeymart.js", "game-saves/games/subway.js", "game-saves/games/stickmanhook.js", "game-saves/games/jetpackjoyride.js", "game-saves/games/dune.js", "game-saves/games/cookieclicker.js", "game-saves/games/bundled.js", "game-saves/restore.js", "game-saves/backup.js",
         "game-saves/save-vault.js", "app.js",
     )
     missing_links = [name for name in script_paths if 'src="' + name + '"' not in markup]

@@ -44,12 +44,36 @@
   }
   function bind(api) { vault = api; }
   function summary(id, files, groupFiles) {
-    return editors.get(id)?.summary(files, groupFiles) || null;
+    const editor = editors.get(id);
+    if (editor) {
+      const result = editor.summary(files, groupFiles);
+      if (result) return result;
+    }
+    return groupFiles?.size ? { generic: true, fields: [] } : null;
   }
   function open(id, groupFiles) {
     const editor = editors.get(id);
-    if (!editor || !vault) return;
-    editor.open(groupFiles, vault, ui);
+    if (!vault) return;
+    if (editor && editor.summary(vault.files(), groupFiles)) { editor.open(groupFiles, vault, ui); return; }
+    const dialog = make('dialog', 'dialog gs-dialog');
+    const head = make('div', 'gs-dialog-top');
+    head.append(make('h2', '', 'Save details'));
+    const close = make('button', 'close-button', '×');
+    close.type = 'button'; close.setAttribute('aria-label', 'Close');
+    close.addEventListener('click', () => dialog.close()); head.append(close);
+    const note = make('p', 'gs-editor-note',
+      'This game does not have a verified stats decoder yet. Its backups can still be exported, backed up, and restored. No save data will be changed here.');
+    const body = make('div', 'gs-dialog-body');
+    for (const f of vault.files().filter(f => groupFiles.has(f.name))) {
+      const section = make('section', 'gs-section');
+      section.append(make('h3', '', f.name));
+      const count = [...f.content.matchAll(/^#(?:>|=)[a-z0-9_.-]+:/gim)].length;
+      section.append(make('p', 'muted', count + ' embedded save record(s) · ' +
+        new Blob([f.content]).size.toLocaleString() + ' bytes of backed-up script data'));
+      body.append(section);
+    }
+    dialog.append(head, note, body); document.body.append(dialog);
+    dialog.addEventListener('close', () => dialog.remove(), {once:true}); dialog.showModal();
   }
   window.NumPlaySaveStats = { register, bind, summary, open, ui };
 })();

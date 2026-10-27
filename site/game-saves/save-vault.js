@@ -180,41 +180,61 @@
         img.addEventListener('error', () => { img.src = 'kit/variants/NumPlay.png'; }, { once: true });
         icon.append(img);
       } else icon.textContent = '📁';
+      // Keep the filename and backup date with the title, not in the action area.
       const details = make('div', 'vault-details');
       details.append(make('strong', '', title(g.id)), make('p', 'muted', [...g.files].join(' · ')));
+      const savedAt = make('p', 'vault-saved-at');
+      savedAt.append(make('strong', '', 'Backed up'), document.createTextNode(' · ' + fmtDate(g.updated)));
+      details.append(savedAt);
+
+      // The middle column contains only game-specific summary values.
+      const bar = make('div', 'vault-inline-stats');
+      const info = window.NumPlaySaveStats?.summary(g.id, stored, g.files);
+      if (info?.error) {
+        bar.append(make('span', 'vault-stat', 'Stats unavailable'));
+      } else if (info) {
+        const fields = Array.isArray(info.fields) ? info.fields :
+          (info.coins !== undefined ? [
+            { label: 'Coins', value: Number(info.coins).toLocaleString() },
+            { label: 'Cars', value: info.cars + '/13' },
+            { label: 'Maps', value: info.maps + '/13' }
+          ] : []);
+        for (const {label, value} of fields) {
+          const item = make('span', 'vault-stat');
+          item.append(make('strong', '', label + ': '), document.createTextNode(String(value)));
+          bar.append(item);
+        }
+        if (!fields.length) bar.append(make('span', 'vault-stat', 'Stats coming soon'));
+      } else {
+        bar.append(make('span', 'vault-stat', 'Stats not available'));
+      }
+
+      // Action buttons always follow the same order, right-aligned on wide screens.
+      const actions = make('div', 'vault-game-actions');
       if (g.id !== 'unknown') {
-        const restoreOne = make('button', 'button button-outline vault-restore-one', 'Restore this game');
+        const see = make('button', 'button button-outline vault-stats-one', 'Game stats');
+        see.type = 'button';
+        see.title = info?.generic ? 'View backed-up game files' : 'See this game’s stats and edit supported values';
+        see.disabled = !window.NumPlaySaveStats;
+        see.addEventListener('click', () => window.NumPlaySaveStats.open(g.id, g.files));
+
+        const backupOne = make('button', 'button button-outline vault-backup-one', 'Back up game');
+        backupOne.type = 'button';
+        backupOne.title = "Read this game's current progress from the calculator into Save Vault";
+        backupOne.disabled = usbBusy;
+        backupOne.addEventListener('click', () => runBackupGame(g.id));
+
+        const restoreOne = make('button', 'button button-outline vault-restore-one', 'Restore game');
         restoreOne.type = 'button';
         restoreOne.title = "Replace this game's calculator save with your browser backup";
         restoreOne.disabled = usbBusy;
         restoreOne.addEventListener('click', () => restoreBackups(g.id));
-        details.append(restoreOne);
+        actions.append(see, backupOne, restoreOne);
+      } else {
+        row.classList.add('vault-item-unmatched');
       }
-      if (window.NumPlaySaveStats) {
-        const info = window.NumPlaySaveStats.summary(g.id, stored, g.files);
-        if (info) {
-          const bar = make('div', 'vault-inline-stats');
-          if (info.error) {
-            bar.append(make('span', 'vault-stat', 'Stats unavailable'));
-          } else {
-            for (const [label, value] of [
-              ['Coins', info.coins.toLocaleString()],
-              ['Cars', info.cars + '/13'], ['Maps', info.maps + '/13']]) {
-              const item = make('span', 'vault-stat');
-              item.append(make('strong', '', label + ': '), document.createTextNode(value));
-              bar.append(item);
-            }
-          }
-          const see = make('button', 'vault-stats-link', 'See all stats');
-          see.type = 'button';
-          see.addEventListener('click', () => window.NumPlaySaveStats.open(g.id, g.files));
-          bar.append(see);
-          details.append(bar);
-        }
-      }
-      const meta = make('div', 'vault-meta');
-      meta.append(make('strong', '', 'Backed up'), make('span', '', fmtDate(g.updated)));
-      row.append(icon, details, meta); list.append(row);
+      row.append(icon, details, bar, actions);
+      list.append(row);
     }
   }
   function refresh() { if (!ready) return; render(); }
@@ -498,6 +518,46 @@
     } catch (error) {
       workUpdate('vault-usb', 'Backup stopped: ' + (error?.message || error), 0);
     } finally { usbBusy = false; btn.disabled = false; doneWork(dialog); }
+  }
+  // Read-only backup of a single game's save records. Never writes to USB.
+  async function runBackupGame(gameId) {
+    if (usbBusy) return;
+    if (!ready || !window.NumPlayUsbRead || !window.NumPlayGameSaveBackup) {
+      notifier('Save backup is not available. Refresh the page.'); return;
+    }
+    usbBusy = true;
+    const dialog = beginWork('vault-usb-dialog', 'Back up ' + title(gameId));
+    const btn = $('vault-backup-usb'); btn.disabled = true;
+    $('vault-usb-results').replaceChildren();
+    workUpdate('vault-usb', 'Choose your NumWorks in the USB window…', 0);
+    refresh();
+    let session;
+    try {
+      // Ask for the calculator synchronously from the button click.
+      const connection = window.NumPlayUsbRead.requestSession(usbStatus);
+      session = await connection;
+      workUpdate('vault-usb', 'Finding ' + title(gameId) + ' save records…', 75);
+      await loadGameMap();
+      const patterns = gameMap.get(gameId);
+      const result = window.NumPlayGameSaveBackup.collect(gameId, patterns, session.records, session.files);
+      const { tally, changes } = await saveUsbFiles(result.files, session.model, 'vault-usb');
+      const list = $('vault-usb-results');
+      const row = make('li');
+      row.append(make('span', '', title(gameId)), make('small', '', 'Backed up in this browser'));
+      list.append(row);
+      workUpdate('vault-usb', 'Game backup complete · ' + result.records + ' save record' +
+        (result.records === 1 ? '' : 's') + ' · ' + tally.added + ' new, ' +
+        tally.updated + ' updated, ' + tally.unchanged + ' unchanged', 100);
+      notifier(title(gameId) + ' progress backed up in this browser.');
+    } catch (error) {
+      workUpdate('vault-usb', 'Game backup stopped: ' + (error?.message || error), 0);
+    } finally {
+      if (session) await session.close().catch(() => {});
+      usbBusy = false;
+      btn.disabled = false;
+      doneWork(dialog);
+      refresh();
+    }
   }
   async function getInstallBackup(id) {
     return new Promise((resolve, reject) => {
